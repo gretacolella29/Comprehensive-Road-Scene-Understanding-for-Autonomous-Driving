@@ -6,10 +6,10 @@
 
 from typing import Optional
 import torch
-import lightning
+from lightning.pytorch import LightningDataModule
 
 
-class LightningDataModule(lightning.LightningDataModule):
+class LightningDataModule(LightningDataModule):
     def __init__(
         self,
         path,

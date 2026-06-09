@@ -1,0 +1,51 @@
+data:
+  class_path: datasets.cityscapes_semantic.CityscapesSemantic
+  init_args:
+    batch_size: 1
+    img_size:
+    - 640
+    - 640
+    path: /content/drive/My Drive/Comprehensive Road Scene Understanding for Autonomous
+      Driving/datasets/cityscapes
+model:
+  class_path: training.mask_classification_semantic.MaskClassificationSemantic
+  init_args:
+    attn_mask_annealing_enabled: true
+    attn_mask_annealing_end_steps:
+    - 6634
+    - 11609
+    - 16585
+    attn_mask_annealing_start_steps:
+    - 3317
+    - 8292
+    - 13268
+    ckpt_path: /content/drive/My Drive/Comprehensive Road Scene Understanding for
+      Autonomous Driving/MaskArchitectureAnomaly_CourseProject/trained_models/eomt_coco.bin
+    freeze_encoder_epochs: 5
+    load_ckpt_class_head: false
+    network:
+      class_path: models.eomt.EoMT
+      init_args:
+        encoder:
+          class_path: models.vit.ViT
+          init_args:
+            backbone_name: vit_base_patch14_reg4_dinov2
+        num_blocks: 3
+        num_q: 200
+    unfreeze_last_n_blocks: 0
+trainer:
+  callbacks:
+  - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+    init_args:
+      dirpath: /content/drive/My Drive/Comprehensive Road Scene Understanding for
+        Autonomous Driving/MaskArchitectureAnomaly_CourseProject/eomt/logs/finetune_coco_to_cityscapes/version_3/checkpoints
+      every_n_train_steps: 500
+      filename: step-{step}
+      save_top_k: -1
+  logger:
+    class_path: lightning.pytorch.loggers.CSVLogger
+    init_args:
+      name: finetune_coco_to_cityscapes
+      save_dir: /content/drive/My Drive/Comprehensive Road Scene Understanding for
+        Autonomous Driving/MaskArchitectureAnomaly_CourseProject/eomt/logs
+  max_epochs: 5

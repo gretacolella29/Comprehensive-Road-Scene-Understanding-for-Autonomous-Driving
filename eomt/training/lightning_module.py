@@ -59,6 +59,18 @@ class LightningModule(lightning.LightningModule):
         ckpt_path=None,
         delta_weights=False,
         load_ckpt_class_head=True,
+        freeze_encoder_epochs: int = 0,        # ← AGGIUNTO: epoche con encoder frozen
+        unfreeze_last_n_blocks: int = 0,
+        ignore_idx: int = 255,
+        num_points: int = 12544,
+        oversample_ratio: float = 3.0,
+        importance_sample_ratio: float = 0.75,
+        no_object_coefficient: float = 0.1,
+        mask_coefficient: float = 5.0,
+        dice_coefficient: float = 5.0,
+        class_coefficient: float = 2.0,
+        mask_thresh: float = 0.8,
+        overlap_thresh: float = 0.8,                     # ← AGGIUNTO: quanti block sbloccare dopo
     ):
         super().__init__()
 
@@ -75,6 +87,8 @@ class LightningModule(lightning.LightningModule):
         self.poly_power = poly_power
         self.warmup_steps = warmup_steps
         self.llrd_l2_enabled = llrd_l2_enabled
+        self.freeze_encoder_epochs = freeze_encoder_epochs
+        self.unfreeze_last_n_blocks = unfreeze_last_n_blocks
 
         self.strict_loading = False
 
@@ -98,6 +112,72 @@ class LightningModule(lightning.LightningModule):
             self._raise_on_incompatible(incompatible_keys, load_ckpt_class_head)
 
         self.log = torch.compiler.disable(self.log)  # type: ignore
+
+    def on_train_epoch_start(self):
+        """
+        Fase 1 (epoch < freeze_encoder_epochs): tutto il backbone frozen,
+        solo class_head + mask head + query tokens trainabili.
+        
+        Fase 2 (epoch >= freeze_encoder_epochs): sblocca gli ultimi
+        unfreeze_last_n_blocks block del backbone.
+        """
+        if self.freeze_encoder_epochs == 0:
+            return  # nessun freeze, comportamento originale
+
+        epoch = self.current_epoch
+
+        if epoch < self.freeze_encoder_epochs:
+            # ── FASE 1: freeze tutto il backbone ──────────────────────────
+            for name, param in self.network.named_parameters():
+                if "encoder.backbone" in name:
+                    param.requires_grad = False
+                else:
+                    param.requires_grad = True  # head + query tokens trainabili
+
+            if epoch == 0:  # log solo al primo epoch
+                trainable = sum(
+                    p.numel() for p in self.network.parameters()
+                    if p.requires_grad
+                )
+                total = sum(p.numel() for p in self.network.parameters())
+                rank_zero_info(
+                    f"[Freeze] FASE 1 — Encoder frozen. "
+                    f"Trainabili: {trainable:,} / {total:,} "
+                    f"({100*trainable/total:.1f}%)"
+                )
+
+        elif epoch == self.freeze_encoder_epochs and self.unfreeze_last_n_blocks > 0:
+            # ── FASE 2: sblocca gli ultimi N block ────────────────────────
+            backbone_blocks = len(self.network.encoder.backbone.blocks)
+            unfreeze_from = backbone_blocks - self.unfreeze_last_n_blocks
+
+            for name, param in self.network.named_parameters():
+                if "encoder.backbone.blocks" in name:
+                    # estrai l'indice del block dal nome
+                    parts = name.split(".")
+                    try:
+                        block_idx = int(parts[parts.index("blocks") + 1])
+                        param.requires_grad = block_idx >= unfreeze_from
+                    except (ValueError, IndexError):
+                        param.requires_grad = False
+                else:
+                    param.requires_grad = True  # head + norm + query sempre trainabili
+
+            trainable = sum(
+                p.numel() for p in self.network.parameters()
+                if p.requires_grad
+            )
+            total = sum(p.numel() for p in self.network.parameters())
+            rank_zero_info(
+                f"[Freeze] FASE 2 — Sbloccati ultimi "
+                f"{self.unfreeze_last_n_blocks} block. "
+                f"Trainabili: {trainable:,} / {total:,} "
+                f"({100*trainable/total:.1f}%)"
+            )
+
+
+
+
 
     def configure_optimizers(self):
         encoder_param_names = {
@@ -595,7 +675,8 @@ class LightningModule(lightning.LightningModule):
 
         block_postfix = self.block_postfix(block_idx)
         name = f"{log_prefix}_pred_{batch_idx}{block_postfix}"
-        self.trainer.logger.experiment.log({name: [wandb.Image(Image.open(buf))]})
+        if hasattr(self.trainer.logger.experiment, 'log'):
+            self.trainer.logger.experiment.log({name: [wandb.Image(Image.open(buf))]})
 
     @torch.compiler.disable
     def scale_img_size_semantic(self, size: tuple[int, int]):

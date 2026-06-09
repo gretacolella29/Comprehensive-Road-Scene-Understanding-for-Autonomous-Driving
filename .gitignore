@@ -1,0 +1,14 @@
+# Model weights (too large for GitHub)
+trained_models/*.bin
+trained_models/*.pth
+trained_models/*.pth.tar
+
+# Datasets
+datasets/
+
+# System files
+.DS_Store
+__pycache__/
+*.pyc
+wandb/
+eval/cache_logits_final/

@@ -1,0 +1,21 @@
+Class,IoU (%)
+Road,97.56
+sidewalk,81.23
+building,90.79
+wall,49.46
+fence,54.88
+pole,60.82
+traffic light,62.56
+traffic sign,72.24
+vegetation,91.35
+terrain,60.97
+sky,93.23
+person,76.17
+rider,53.51
+car,92.83
+truck,72.73
+bus,78.82
+train,63.83
+motorcycle,46.35
+bicycle,71.89
+MEAN,72.17

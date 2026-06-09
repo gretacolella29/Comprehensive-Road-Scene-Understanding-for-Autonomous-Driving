@@ -1,8 +1,7 @@
-# ---------------------------------------------------------------
+# --------------------------------------------------------------------------------------------
 # © 2025 Mobile Perception Systems Lab at TU/e. All rights reserved.
 # Licensed under the MIT License.
-# ---------------------------------------------------------------
-
+# --------------------------------------------------------------------------------------------
 
 from typing import List, Optional
 import torch.nn as nn
@@ -41,6 +40,8 @@ class MaskClassificationSemantic(LightningModule):
         ckpt_path: Optional[str] = None,
         delta_weights: bool = False,
         load_ckpt_class_head: bool = True,
+        freeze_encoder_epochs: int = 0,
+        unfreeze_last_n_blocks: int = 0,
     ):
         super().__init__(
             network=network,
@@ -59,10 +60,11 @@ class MaskClassificationSemantic(LightningModule):
             ckpt_path=ckpt_path,
             delta_weights=delta_weights,
             load_ckpt_class_head=load_ckpt_class_head,
+            freeze_encoder_epochs=freeze_encoder_epochs,
+            unfreeze_last_n_blocks=unfreeze_last_n_blocks,
         )
 
         self.save_hyperparameters(ignore=["_class_path"])
-
         self.ignore_idx = ignore_idx
         self.mask_thresh = mask_thresh
         self.overlap_thresh = overlap_thresh
@@ -78,36 +80,21 @@ class MaskClassificationSemantic(LightningModule):
             num_labels=num_classes,
             no_object_coefficient=no_object_coefficient,
         )
-
         self.init_metrics_semantic(ignore_idx, self.network.num_blocks + 1 if self.network.masked_attn_enabled else 1)
 
-    def eval_step(
-        self,
-        batch,
-        batch_idx=None,
-        log_prefix=None,
-    ):
+    def eval_step(self, batch, batch_idx=None, log_prefix=None):
         imgs, targets = batch
-
         img_sizes = [img.shape[-2:] for img in imgs]
         crops, origins = self.window_imgs_semantic(imgs)
         mask_logits_per_layer, class_logits_per_layer = self(crops)
-
         targets = self.to_per_pixel_targets_semantic(targets, self.ignore_idx)
-
-        for i, (mask_logits, class_logits) in enumerate(
-            list(zip(mask_logits_per_layer, class_logits_per_layer))
-        ):
+        for i, (mask_logits, class_logits) in enumerate(list(zip(mask_logits_per_layer, class_logits_per_layer))):
             mask_logits = F.interpolate(mask_logits, self.img_size, mode="bilinear")
             crop_logits = self.to_per_pixel_logits_semantic(mask_logits, class_logits)
             logits = self.revert_window_logits_semantic(crop_logits, origins, img_sizes)
-
             self.update_metrics_semantic(logits, targets, i)
-
             if batch_idx == 0:
-                self.plot_semantic(
-                    imgs[0], targets[0], logits[0], log_prefix, i, batch_idx
-                )
+                self.plot_semantic(imgs[0], targets[0], logits[0], log_prefix, i, batch_idx)
 
     def on_validation_epoch_end(self):
         self._on_eval_epoch_end_semantic("val")
