@@ -52,23 +52,3 @@ Place the following zip files in `datasets/cityscapes/` (no extraction needed):
 
 Download `Anomaly_Validation_Datasets.zip` from the course materials and extract into `eval/anomaly_datasets/`.
 
----
-
-## Execution Order
-
-```
-1. inference_eomt_coco_ft.ipynb       # Zero-shot baseline + COCO→CS mapping
-2. finetuning_3_exp.ipynb             # Fine-tuning (set EXP_TYPE below)
-3. eval/evalAnomaly.ipynb             # ERFNet anomaly baselines
-4. eval/evalAnomaly_eomt_final.ipynb  # EoMT anomaly evaluation
-```
-
-For Step 5, run the notebook three times with different `EXP_TYPE` values:
-
-```python
-EXP_TYPE = "head_only"    # Strategy A
-EXP_TYPE = "blocks_8_11"  # Strategy B
-EXP_TYPE = "lora"         # Strategy C
-```
-
-The notebook resumes automatically from the last checkpoint if training is interrupted. Replace `YOUR_WANDB_API_KEY` with your own key before running.
