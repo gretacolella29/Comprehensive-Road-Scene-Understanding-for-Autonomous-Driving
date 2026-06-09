@@ -3,7 +3,7 @@
 **FAIMDL 2025/26 — Image Segmentation Project**
 Politecnico di Torino
 
-> **Report**: [add link before submission]
+> **Report**: 3_IS_s353753_s362637_s353385_s353978_Colella_Giordana_Ferrara_Cellaura
 > **Experiment tracking (W&B)**: [https://wandb.ai/danieleferrara-politecnico-di-torino/eomt?nw=nwuserdanieleferrara]
 
 ---
